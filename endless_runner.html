@@ -1,0 +1,347 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<title>Endless Runner</title>
+<style>
+  body {
+    margin: 0;
+    background: #87CEFA; /* kolor BLUE */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+  }
+  canvas {
+    background: #87CEFA;
+    display: block;
+    border: 2px solid black;
+  }
+  #gameOverScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px 40px;
+    border: 3px solid red;
+    text-align: center;
+    display: none;
+  }
+  #gameOverScreen button {
+    margin: 10px;
+    font-size: 16px;
+    padding: 8px 16px;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+
+<div id="gameOverScreen">
+  <h1 style="color:red;">Game Over!</h1>
+  <p id="finalScore"></p>
+  <p id="bestScoreText"></p>
+  <button id="retryBtn">Zagraj ponownie (R)</button>
+  <button id="menuBtn">Menu (M)</button>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const WIDTH = canvas.width;
+  const HEIGHT = canvas.height;
+
+  // Kolory
+  const COLORS = {
+    BLUE: "#87CEFA",
+    BLACK: "#000000",
+    RED: "#C80000",
+    GREEN: "#00C800",
+    BROWN: "#8B4513",
+    GRAY: "#646464",
+    WHITE: "#FFFFFF"
+  };
+
+  // Player
+  const player = {
+    x: 100,
+    y: HEIGHT - 20 - 40,
+    width: 20,
+    height: 20,
+    yVelocity: 0,
+    gravity: 1,
+    jumpForce: -15,
+    onGround: true,
+  };
+
+  // Game objects
+  let obstacles = [];
+  let platforms = [];
+  let spikes = [];
+
+  let score = 0;
+  let bestScore = 0;
+
+  // Timers
+  let spawnTimer = 0;
+  let platformTimer = 0;
+  let spikeTimer = 0;
+
+  let gameRunning = false;
+
+  // DOM Elements for game over
+  const gameOverScreen = document.getElementById("gameOverScreen");
+  const finalScoreEl = document.getElementById("finalScore");
+  const bestScoreTextEl = document.getElementById("bestScoreText");
+  const retryBtn = document.getElementById("retryBtn");
+  const menuBtn = document.getElementById("menuBtn");
+
+  // Local Storage for best score
+  function loadBestScore() {
+    const saved = localStorage.getItem("bestScore");
+    return saved ? parseInt(saved) : 0;
+  }
+
+  function saveBestScore(newScore) {
+    localStorage.setItem("bestScore", newScore);
+  }
+
+  // Spike drawing helper (triangle)
+  function drawSpike(x, y) {
+    ctx.fillStyle = COLORS.GRAY;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 20);
+    ctx.lineTo(x + 10, y);
+    ctx.lineTo(x + 20, y + 20);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Check collision between two rects
+  function rectsCollide(r1, r2) {
+    return !(r2.x > r1.x + r1.width ||
+             r2.x + r2.width < r1.x ||
+             r2.y > r1.y + r1.height ||
+             r2.y + r2.height < r1.y);
+  }
+
+  // Reset game state
+  function resetGame() {
+    player.y = HEIGHT - player.height - 40;
+    player.yVelocity = 0;
+    player.onGround = true;
+
+    obstacles = [];
+    platforms = [];
+    spikes = [];
+
+    score = 0;
+    spawnTimer = 0;
+    platformTimer = 0;
+    spikeTimer = 0;
+    gameRunning = true;
+
+    gameOverScreen.style.display = "none";
+  }
+
+  // Show Game Over screen
+  function showGameOver() {
+    gameRunning = false;
+    finalScoreEl.textContent = `SCORE: ${score}`;
+    bestScoreTextEl.textContent = `BEST SCORE: ${bestScore}`;
+    gameOverScreen.style.display = "block";
+  }
+
+  // Main game loop
+  function gameLoop() {
+    if (!gameRunning) return;
+
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    // Gravity and movement
+    player.yVelocity += player.gravity;
+    player.y += player.yVelocity;
+    player.onGround = false;
+
+    // Player rect for collisions
+    const playerRect = {
+      x: player.x,
+      y: player.y,
+      width: player.width,
+      height: player.height
+    };
+
+    // Ground collision
+    if (player.y >= HEIGHT - player.height - 40) {
+      player.y = HEIGHT - player.height - 40;
+      player.yVelocity = 0;
+      player.onGround = true;
+    }
+
+    // Platform collision
+    platforms.forEach(platform => {
+      if (rectsCollide(playerRect, platform) && player.yVelocity > 0) {
+        player.y = platform.y - player.height;
+        player.yVelocity = 0;
+        player.onGround = true;
+      }
+    });
+
+    // Draw player
+    ctx.fillStyle = COLORS.GREEN;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+
+    // Spawn obstacles
+    spawnTimer++;
+    if (spawnTimer > 90) {
+      let obs = {
+        x: WIDTH + Math.random() * 200 + 100,
+        y: HEIGHT - 60 - 40,
+        width: 40,
+        height: 60
+      };
+      obstacles.push(obs);
+      spawnTimer = 0;
+    }
+
+    // Spawn platforms with spikes
+    platformTimer++;
+    if (platformTimer > 150) {
+      let platWidth = 100;
+      let platHeight = 20;
+      let platform = {
+        x: WIDTH + Math.random() * 200 + 200,
+        y: Math.random() * 100 + 150,
+        width: platWidth,
+        height: platHeight
+      };
+      platforms.push(platform);
+
+      let spike = {
+        x: platform.x + platWidth / 2 - 10,
+        y: platform.y + platHeight + 5,
+        width: 20,
+        height: 20
+      };
+      spikes.push(spike);
+
+      platformTimer = 0;
+    }
+
+    // Spawn spikes on ground
+    spikeTimer++;
+    if (spikeTimer > 180) {
+      let spike = {
+        x: WIDTH + Math.random() * 300 + 300,
+        y: HEIGHT - 20 - 40,
+        width: 20,
+        height: 20
+      };
+      spikes.push(spike);
+      spikeTimer = 0;
+    }
+
+    // Move and draw obstacles
+    obstacles.forEach((obs, i) => {
+      obs.x -= 6;
+      ctx.fillStyle = COLORS.RED;
+      ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+      if (rectsCollide(playerRect, obs)) {
+        if(score > bestScore) {
+          bestScore = score;
+          saveBestScore(bestScore);
+        }
+        showGameOver();
+      }
+
+      if (obs.x + obs.width < 0) {
+        obstacles.splice(i, 1);
+      }
+    });
+
+    // Move and draw platforms
+    platforms.forEach((plat, i) => {
+      plat.x -= 6;
+      ctx.fillStyle = COLORS.BROWN;
+      ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+
+      if (plat.x + plat.width < 0) {
+        platforms.splice(i, 1);
+      }
+    });
+
+    // Move and draw spikes
+    spikes.forEach((spike, i) => {
+      spike.x -= 6;
+      drawSpike(spike.x, spike.y);
+
+      if (rectsCollide(playerRect, spike)) {
+        if(score > bestScore) {
+          bestScore = score;
+          saveBestScore(bestScore);
+        }
+        showGameOver();
+      }
+
+      if (spike.x + spike.width < 0) {
+        spikes.splice(i, 1);
+      }
+    });
+
+    // Draw score
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.font = "24px Arial";
+    ctx.fillText("Wynik: " + score, 10, 30);
+    ctx.fillText("Rekord: " + bestScore, 10, 60);
+
+    score++;
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Input handling
+  window.addEventListener("keydown", e => {
+    if (gameRunning) {
+      if (e.code === "Space" && player.onGround) {
+        player.yVelocity = player.jumpForce;
+        player.onGround = false;
+      }
+    } else {
+      // Game over screen controls
+      if (e.code === "KeyR") {
+        resetGame();
+        gameLoop();
+      }
+      if (e.code === "KeyM") {
+        // Go back to menu (reload page for demo)
+        location.reload();
+      }
+    }
+  });
+
+  retryBtn.addEventListener("click", () => {
+    resetGame();
+    gameLoop();
+  });
+
+  menuBtn.addEventListener("click", () => {
+    location.reload();
+  });
+
+  // Start game immediately for demo
+  bestScore = loadBestScore();
+  resetGame();
+  gameLoop();
+
+})();
+</script>
+
+</body>
+</html>
