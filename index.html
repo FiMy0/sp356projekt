@@ -249,7 +249,7 @@
 
     // Move and draw obstacles
     obstacles.forEach((obs, i) => {
-      obs.x -= 6;
+      obs.x -= 3;
       ctx.fillStyle = COLORS.RED;
       ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
@@ -268,7 +268,7 @@
 
     // Move and draw platforms
     platforms.forEach((plat, i) => {
-      plat.x -= 6;
+      plat.x -= 3;
       ctx.fillStyle = COLORS.BROWN;
       ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
 
@@ -279,7 +279,7 @@
 
     // Move and draw spikes
     spikes.forEach((spike, i) => {
-      spike.x -= 6;
+      spike.x -= 3;
       drawSpike(spike.x, spike.y);
 
       if (rectsCollide(playerRect, spike)) {
